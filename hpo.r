@@ -31,21 +31,21 @@ col_names_hpoa <- c("DatabaseID", "DiseaseName", "Qualifier",
                     "Sex", "Modifier", "Aspect", "Biocuration")
 
 hpo <- read_delim(
-  "phenotype_to_genes.txt", 
+  "phenotype_to_genes.txt",
   delim = "\t",
-  col_names = col_names_hpo, 
+  col_names = col_names_hpo,
   comment = "#") %>%
     select(c(1:4, 7))
 
 hpoa <- read_delim(
-  "phenotype.hpoa", 
+  "phenotype.hpoa",
   delim = "\t",
   col_names = col_names_hpo,
   comment = "#") %>%
   select(c(1,2,4))
 
-hpo_db <-  hpo %>% 
-  left_join(hpoa, by = c("HPO_ID", "DatabaseID")) %>% 
+hpo_db <-  hpo %>%
+  left_join(hpoa, by = c("HPO_ID", "DatabaseID")) %>%
   separate(DatabaseID, c("Database", "ID"))
 
 # write_tsv(hpo_db, "hpo.tsv")
@@ -55,7 +55,7 @@ hpo2gene <- hpo_db %>%
   select(HPO_label, Entrez_symbol) %>%
   unique()
 
-hpo2geneli <- hpo2gene %>% 
+hpo2geneli <- hpo2gene %>%
   group_by(Entrez_symbol) %>%
   group_map(~.x)
 
@@ -65,15 +65,15 @@ names(hpo2geneli) <- hpo2gene %>%
   unlist()
 
 
-hpo2disease <- hpo_db %>% 
+hpo2disease <- hpo_db %>%
   select(HPO_label, DiseaseName) %>%
   unique()
 
-hpo2diseaseli <- hpo2disease %>% 
+hpo2diseaseli <- hpo2disease %>%
   group_by(DiseaseName) %>%
   group_map(~.x)
 
-names(hpo2diseaseli) <- hpo2disease %>% 
+names(hpo2diseaseli) <- hpo2disease %>%
   group_by(DiseaseName) %>%
   group_map(~.y) %>%
   unlist()
@@ -104,7 +104,7 @@ ora_hpo_sub <- function(cond, endications, hpo, N) {
       cond_m <- nrow(hpo[[cond]])
       overlap <- length(intersect(endications, unlist(hpo[cond])))
 
-      ora <- phyper(q = overlap-1, 
+      ora <- phyper(q = overlap-1,
                     m = cond_m,
                     n = N-cond_m,
                     k = number_of_endications,
@@ -130,23 +130,23 @@ ora_hpo_sub <- function(cond, endications, hpo, N) {
 ora_hpo <- function(endications, hpo) {
   if (hpo == "disease") {
     result <- pbapply::pblapply(
-      names(hpo2diseaseli), 
-      ora_hpo_sub, 
-      endications = endications, 
+      names(hpo2diseaseli),
+      ora_hpo_sub,
+      endications = endications,
       hpo = hpo2diseaseli
     )
   } else if (hpo == "gene") {
     result <- pbapply::pblapply(
-      names(hpo2geneli), 
-      ora_hpo_sub, 
-      endications = endications, 
+      names(hpo2geneli),
+      ora_hpo_sub,
+      endications = endications,
       hpo = hpo2geneli)
   }
   adj.tbl <- do.call(rbind, result)
 
   return(
     adj.tbl %>%
-      mutate(adj.p.val = p.adjust(p.val, method = "fdr")) %>% 
+      mutate(adj.p.val = p.adjust(p.val, method = "fdr")) %>%
       arrange(adj.p.val)
   )
 }
@@ -156,10 +156,4 @@ ora_hpo <- function(endications, hpo) {
 my_gene_enrichment <- ora_hpo(my_endications, hpo = "gene")
 
 write_tsv(my_gene_enrichment, file = "test.tsv")
-
-
-
-
-
-
 
